@@ -163,6 +163,25 @@ ResNet18 & 92.27\% \\
 
 The strongest model was ResNet18 with transfer learning. The results suggest that pretrained features were more important than simply increasing the depth of a small CNN trained from scratch.
 
+\section{Saliency Maps and SmoothGrad}
+
+To understand which pixels the ResNet18 transfer-learning model relies on for its \emph{hotdog} predictions, vanilla gradient saliency maps and SmoothGrad saliency maps were computed for five hotdog images from the test set.
+
+A vanilla saliency map is the gradient of the model's \emph{hotdog} class score with respect to the input pixels,
+$$M(x) = \left| \frac{\partial s_{\text{hotdog}}(x)}{\partial x} \right|,$$
+taking the maximum absolute gradient across the three color channels. SmoothGrad averages this map over $n=25$ noisy copies of the image, each perturbed by Gaussian noise $\epsilon \sim \mathcal{N}(0, \sigma^2 I)$ with $\sigma = 0.15$. Adding this noise to an image $x$ is mathematically equivalent to sampling directly from $\mathcal{N}(x, \sigma^2 I)$, since $x + \epsilon$ with $\epsilon \sim \mathcal{N}(0, \sigma^2 I)$ has exactly that distribution. Averaging the saliency map over many such samples cancels out much of the pixel-level noise that a single gradient evaluation produces.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.9\textwidth]{{salency og smoothgrad}.jpg}
+\caption{Five hotdog test images (top), their vanilla saliency maps (middle), and SmoothGrad maps with $\sigma=0.15$ (bottom).}
+\label{fig:saliency}
+\end{figure*}
+
+Do the saliency maps make sense? Only partially. As Figure~\ref{fig:saliency} shows, the vanilla saliency maps are dominated by high-frequency, speckled noise spread across the entire image, with no clear concentration on the hotdog itself. SmoothGrad is somewhat cleaner, and for two of the five images (the hotdog-and-fries combo and the person eating a hotdog) there is a faintly brighter region roughly overlapping the hotdog/mouth area, suggesting the model does pick up on relevant content there. For the other three images, however, the improvement over vanilla saliency is marginal, and none of the maps produce a crisp outline of the hotdog shape.
+
+A likely explanation is that the saliency gradient passes through the entire ResNet18 backbone, which was pretrained on ImageNet and kept frozen; only the final classifier layer was fine-tuned. The backbone is a deep, piecewise-linear network (many ReLU non-linearities), which is exactly the kind of network known to produce noisy raw gradients. SmoothGrad's noise-averaging only partially compensates for this with a modest sample count ($n=25$) and a single, fairly arbitrarily chosen noise level ($\sigma=0.15$). A larger sample count or a small sweep over $\sigma$ would likely produce clearer maps, but this was not explored further here due to time constraints.
+
 \section{Discussion}
 
 The experiments show that increasing model complexity alone is not sufficient to obtain better performance. The deeper CNN had more feature extraction layers, but its test accuracy remained similar to the basic CNN, indicating that the main limitation was not simply the number of layers.
@@ -173,7 +192,9 @@ Transfer learning was substantially more effective. ResNet18 could use represent
 
 \section{Limitations and Remaining Analysis}
 
-The current notebook does not yet contain a systematic list of misclassified test images, nor saliency maps or SmoothGrad visualizations. These should be added before the final submission.
+The current notebook does not yet contain a systematic list of misclassified test images, only a qualitative check on a handful of custom images. A full confusion-matrix-style breakdown of which test images are misclassified, and why, would strengthen the error analysis.
+
+The saliency and SmoothGrad maps (Section~8) are noisier than typical examples in the literature; a hyperparameter sweep over the noise level $\sigma$ and the number of samples $n$ was not performed and is left as future work.
 
 A held-out validation split, separate from the test set, was used for model selection throughout development (see Section 2), and the test set was evaluated only once per model at the end. For a stricter scientific evaluation, results reported here as single-split test accuracy could additionally be cross-checked with the five-fold validation numbers in Section 7.
 
@@ -187,6 +208,6 @@ The project decisions, interpretation of the results, and understanding of the u
 
 The best-performing approach was transfer learning with ResNet18, achieving 92.27\% test accuracy, while five-fold cross-validation produced a mean validation accuracy of 93.11\% with a standard deviation of 1.09 percentage points.
 
-The results demonstrate that pretrained convolutional features can provide a substantial advantage over a small CNN trained from scratch. Further work should include a detailed error analysis and saliency/SmoothGrad visualizations to better understand which image regions influence the predictions.
+The results demonstrate that pretrained convolutional features can provide a substantial advantage over a small CNN trained from scratch. Saliency and SmoothGrad maps show only a weak, partial signal that the model attends to the hotdog region itself, suggesting the frozen ImageNet backbone's raw gradients remain noisy even after averaging; a more thorough error analysis and a hyperparameter sweep for SmoothGrad are natural next steps.
 
 \end{document}
