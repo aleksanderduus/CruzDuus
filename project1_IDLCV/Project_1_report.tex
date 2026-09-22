@@ -30,84 +30,36 @@ Aleksander Duus\\
 \section{Introduction}
 \label{sec:intro}
 
-The objective of this project was to classify images into two classes: \emph{hotdog} and \emph{not hotdog}, recreating the classic ``SeeFood'' app from the TV show \emph{Silicon Valley}. The dataset contains hotdog images and non-hotdog images drawn from several ImageNet~\cite{deng2009imagenet} categories, including food, frankfurter, chili-dog, pets, furniture, and people.
-
-This report compares convolutional neural networks (CNNs) trained from scratch with a pretrained convolutional neural network used through transfer learning. Section~\ref{sec:background} gives background on the building blocks used (CNNs, batch normalization, transfer learning, and saliency-based interpretability methods). Section~\ref{sec:method} describes the dataset, architectures, and training protocol. Section~\ref{sec:experiments} reports and discusses the results, including a comparison across models, five-fold cross-validation, and saliency/SmoothGrad visualizations. Section~\ref{sec:conclusion} concludes and discusses the use of generative AI tools during the project.
+We classify images into \emph{hotdog} and \emph{not hotdog}, recreating the ``SeeFood'' app from \emph{Silicon Valley}. The dataset draws on several ImageNet~\cite{deng2009imagenet} categories (food, frankfurter, chili-dog, pets, furniture, people). We compare CNNs trained from scratch with a pretrained ResNet18~\cite{he2016deep} used via transfer learning, and probe the best model with saliency maps and SmoothGrad~\cite{smilkov2017smoothgrad}.
 
 \section{Background}
 \label{sec:background}
 
-\subsection{Convolutional Neural Networks}
+CNNs learn a hierarchy of convolutional filters, from edges in early layers to object parts in deeper layers, making them well suited to image classification. Batch normalization stabilizes activation statistics across a mini-batch and eases optimization; dropout and weight decay reduce overfitting by limiting the network's tendency to memorize training examples. Transfer learning reuses a network pretrained on a large dataset (ImageNet~\cite{deng2009imagenet}) so that only the final classifier needs retraining, which helps when the target dataset is small. We use ResNet18~\cite{he2016deep}, a residual architecture with skip connections, as the pretrained backbone.
 
-Convolutional neural networks (CNNs) apply learned filters over local neighborhoods of an image, followed by non-linear activations (ReLU) and spatial pooling. Stacking convolutional blocks lets the network build up a hierarchy of features, from edges and textures in early layers to object parts and semantic concepts in deeper layers. This makes CNNs well suited to image classification tasks such as hotdog/not-hotdog.
-
-\subsection{Batch Normalization and Regularization}
-
-Batch normalization normalizes the activations of a layer across a mini-batch, which stabilizes and often speeds up training. Dropout randomly zeroes a fraction of activations during training, and weight decay penalizes large weights; both reduce the tendency of a network to memorize the training set instead of learning generalizable features.
-
-\subsection{Transfer Learning}
-
-Transfer learning reuses a network pretrained on a large dataset (typically ImageNet~\cite{deng2009imagenet}) for a new, smaller task. Because the pretrained convolutional layers already encode general-purpose visual features, only the final classification layer(s) need to be retrained, which is especially valuable when the target dataset is too small to train a deep network from scratch. In this project we use ResNet18~\cite{he2016deep}, a residual network architecture that uses skip connections to ease the training of deeper networks, as the pretrained backbone.
-
-\subsection{Saliency Maps and SmoothGrad}
-\label{sec:background-saliency}
-
-A saliency map highlights which input pixels most influence a model's prediction. For an input image $x$ and the model's score for a target class $s_c(x)$ (the logit before softmax), the vanilla gradient saliency map is
+\paragraph{Saliency and SmoothGrad.} For input $x$ and target-class score $s_c(x)$, the vanilla saliency map is the gradient
 \begin{equation}
-M(x) = \left| \frac{\partial s_c(x)}{\partial x} \right|,
+M(x) = \left| \partial s_c(x) / \partial x \right|,
 \label{eq:saliency}
 \end{equation}
-i.e.\ the gradient of the class score with respect to the input pixels. A large gradient magnitude at a pixel indicates that a small change there would change the class score the most, so the model is effectively ``paying attention'' to it.
-
-Raw gradients of deep networks are often visually noisy, since the gradient can vary sharply between nearby input points. SmoothGrad~\cite{smilkov2017smoothgrad} reduces this noise by averaging saliency maps computed on several noisy copies of the same image:
+which is often noisy since gradients of deep networks vary sharply between nearby points. SmoothGrad~\cite{smilkov2017smoothgrad} averages $M$ over $n$ noisy copies of $x$:
 \begin{equation}
-\hat{M}(x) = \frac{1}{n}\sum_{i=1}^{n} M(x + \epsilon_i), \qquad \epsilon_i \sim \mathcal{N}(0, \sigma^2 I).
+\hat{M}(x) = \tfrac{1}{n}\textstyle\sum_{i=1}^{n} M(x + \epsilon_i), \; \epsilon_i \sim \mathcal{N}(0, \sigma^2 I).
 \label{eq:smoothgrad}
 \end{equation}
-Adding Gaussian noise $\epsilon \sim \mathcal{N}(0, \sigma^2 I)$ to an image $x$ to form $x+\epsilon$ is mathematically the same as drawing a sample directly from a normal distribution centered at $x$, i.e.\ $x + \epsilon \sim \mathcal{N}(x, \sigma^2 I)$; this is simply a reparameterization of the same distribution. The noise level $\sigma$ is a hyperparameter: too small and the result resembles the still-noisy vanilla saliency map; too large and real structure in the image is blurred out, since the model is then effectively evaluated far from the original input.
+Adding noise $\epsilon\sim\mathcal{N}(0,\sigma^2I)$ to $x$ is equivalent to sampling $x+\epsilon \sim \mathcal{N}(x,\sigma^2I)$ directly, so this averages saliency over samples drawn around $x$. Small $\sigma$ leaves the map noisy; large $\sigma$ blurs out real structure.
 
 \section{Method}
 \label{sec:method}
 
-\subsection{Dataset and Preprocessing}
+\paragraph{Data.} Images have varying resolution/aspect ratio. For the CNNs, images are resized to $128\times128$; training additionally uses random horizontal flips, rotations up to $10^\circ$, brightness/contrast/saturation jitter, and normalization with mean/std $(0.5,0.5,0.5)$. Test-time preprocessing skips augmentation. For ResNet18, images are resized to $224\times224$ and normalized with ImageNet statistics. An 80/20 stratified train/validation split is held out from the training data for model selection; the test set is touched only once per model, at the end.
 
-All input images have different resolutions and aspect ratios. To create batches with a common shape, images were resized to $128 \times 128$ pixels for the CNN experiments. The training pipeline used:
-\begin{itemize}
-    \item Resize to $128 \times 128$
-    \item Random horizontal flipping
-    \item Random rotation of up to 10 degrees
-    \item Random brightness, contrast, and saturation changes
-    \item Conversion to tensors
-    \item Normalization with mean $(0.5, 0.5, 0.5)$ and standard deviation $(0.5, 0.5, 0.5)$
-\end{itemize}
-The test pipeline used resizing, tensor conversion, and the same normalization, but no random augmentation, ensuring deterministic evaluation. For ResNet18, images were instead resized to $224 \times 224$ pixels and normalized using the ImageNet mean and standard deviation, as expected by the pretrained model.
+\paragraph{Models.} \textbf{Basic CNN}: 3 conv layers (16/32/64 channels), ReLU, max pooling, dropout classifier. \textbf{Regularized CNN}: adds batch normalization, adaptive average pooling, dropout ($p{=}0.5$), weight decay, early stopping. \textbf{Deeper CNN}: regularized architecture plus a fourth conv block (128 channels). \textbf{ResNet18 transfer learning}: ImageNet-pretrained ResNet18~\cite{he2016deep} with the backbone frozen and the final layer replaced by dropout + a 2-class linear layer; only this head is trained.
 
-A stratified train/validation split (80/20) was held out from the training data for model selection. The separate test set was kept untouched during development and evaluated only once per model, at the end of training.
-
-\subsection{Model Architectures}
-
-Four models were compared:
-\begin{itemize}
-    \item \textbf{Basic CNN}: three convolutional layers (16, 32, 64 channels), each followed by ReLU and max pooling, and a fully connected classifier with dropout.
-    \item \textbf{Regularized CNN}: the same convolutional backbone with batch normalization added after each convolution, adaptive average pooling, dropout ($p=0.5$), weight decay, and early stopping.
-    \item \textbf{Deeper CNN}: a fourth convolutional block (128 channels) added on top of the regularized architecture, for additional representational capacity.
-    \item \textbf{ResNet18 transfer learning}: an ImageNet-pretrained ResNet18~\cite{he2016deep} with all convolutional parameters frozen; the final fully connected layer was replaced with a dropout layer followed by a two-class linear layer, and only this new classifier head was trained.
-\end{itemize}
-
-\subsection{Training Protocol}
-
-All models were trained with cross-entropy loss and the Adam optimizer. The basic and deeper CNNs used a learning rate of $0.001$; the regularized CNN additionally used a weight decay of $10^{-4}$ and early stopping with a patience of 3 epochs on validation accuracy. The ResNet18 classifier head was trained with Adam at a learning rate of $0.001$.
-
-To evaluate the stability of the transfer-learning result, stratified five-fold cross-validation was additionally performed on the training set, preserving the class distribution in each fold. The separate test set was not used to create the folds.
-
-\subsection{Saliency and SmoothGrad Setup}
-
-To probe which pixels the ResNet18 model relies on for its \emph{hotdog} predictions, vanilla saliency maps (Eq.~\ref{eq:saliency}) and SmoothGrad maps (Eq.~\ref{eq:smoothgrad}) were computed for five hotdog images from the test set, using the gradient of the \emph{hotdog} class score. SmoothGrad used $n=25$ noisy samples per image with noise level $\sigma = 0.15$. For both methods, the gradient magnitude was reduced to a single-channel heatmap by taking the maximum absolute value across the three color channels.
+\paragraph{Training.} All models use cross-entropy loss and Adam (lr $=0.001$); the regularized CNN adds weight decay $10^{-4}$ and early stopping (patience 3). Stratified 5-fold cross-validation on the training set further checks the stability of the ResNet18 result. For saliency, we use the gradient of the \emph{hotdog} class score (Eq.~\ref{eq:saliency}) on 5 hotdog test images, and SmoothGrad (Eq.~\ref{eq:smoothgrad}) with $n{=}25$, $\sigma{=}0.15$; both are reduced to a heatmap via the max absolute gradient across color channels.
 
 \section{Experiments and Results}
 \label{sec:experiments}
-
-\subsection{CNNs Trained from Scratch}
 
 \begin{table}[h]
 \centering
@@ -117,131 +69,56 @@ To probe which pixels the ResNet18 model relies on for its \emph{hotdog} predict
 Model & Train acc. & Test acc. \\
 \midrule
 Basic CNN & 83.29\% & 78.79\% \\
-\bottomrule
-\end{tabular}
-\caption{Basic CNN results.}
-\label{tab:basic}
-\end{table}
-
-The basic CNN (Table~\ref{tab:basic}) reached 78.79\% test accuracy. The gap between training and test accuracy indicates some overfitting, but the model clearly learned useful visual features, performing well above random guessing.
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{lrr}
-\toprule
-Model & Train acc. & Test acc. \\
-\midrule
+Regularized CNN & -- & 78.89\% \\
 Deeper CNN & 80.88\% & 77.18\% \\
+ResNet18 (transfer) & 90.84\% & \textbf{91.68\%} \\
 \bottomrule
 \end{tabular}
-\caption{Deeper CNN results.}
-\label{tab:deeper}
+\caption{Test accuracy across all models (Regularized CNN's train accuracy was not logged before early stopping).}
+\label{tab:results}
 \end{table}
 
-The regularized model achieved a best recorded test accuracy of 78.89\% before early stopping, essentially on par with the basic CNN (78.79\%): batch normalization and stronger regularization did not produce a meaningful improvement in this run. The deeper CNN (Table~\ref{tab:deeper}), with a fourth convolutional block, performed slightly worse than the basic CNN. This suggests that simply increasing depth or adding regularization is not, by itself, sufficient to improve performance on this dataset.
-
-\subsection{Transfer Learning with ResNet18}
+Table~\ref{tab:results} summarizes all models. The regularized CNN is essentially on par with the basic CNN, so batch normalization and stronger regularization did not meaningfully help here; the deeper CNN performs slightly worse still, showing that added depth alone does not improve results on this dataset. ResNet18 transfer learning is clearly the strongest, as its pretrained features encode general low/mid-level visual structure that a small CNN cannot learn from this little data.
 
 \begin{table}[h]
 \centering
-\small
-\begin{tabular}{lrr}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrrr}
 \toprule
-Model & Train acc. & Test acc. \\
+Fold & 1 & 2 & 3 & 4 & 5 \\
 \midrule
-ResNet18 transfer learning & 90.84\% & 91.68\% \\
+Val. acc. & 94.63\% & 93.90\% & 92.42\% & 95.84\% & 93.15\% \\
 \bottomrule
 \end{tabular}
-\caption{ResNet18 transfer learning results.}
-\label{tab:resnet}
-\end{table}
-
-ResNet18 (Table~\ref{tab:resnet}) performed substantially better than any CNN trained from scratch. The pretrained convolutional layers already encode useful low- and mid-level visual features (edges, textures, shapes, object parts), which is especially valuable when the available dataset is too small to train a deep network from scratch effectively.
-
-\subsection{Cross-Validation}
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{lr}
-\toprule
-Fold & Validation acc. \\
-\midrule
-1 & 94.63\% \\
-2 & 93.90\% \\
-3 & 92.42\% \\
-4 & 95.84\% \\
-5 & 93.15\% \\
-\bottomrule
-\end{tabular}
-\caption{Five-fold cross-validation results for ResNet18.}
+\caption{Five-fold cross-validation for ResNet18: mean \textbf{93.99\%}, std \textbf{1.18} pp.}
 \label{tab:cv}
 \end{table}
 
-Stratified five-fold cross-validation (Table~\ref{tab:cv}) gave a mean validation accuracy of \textbf{93.99\%} with a standard deviation of \textbf{1.18} percentage points, indicating the ResNet18 result is reasonably stable across different training/validation splits.
-
-\subsection{Comparison of Models}
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{lr}
-\toprule
-Model & Test acc. \\
-\midrule
-Basic CNN & 78.79\% \\
-Regularized CNN & 78.89\% \\
-Deeper CNN & 77.18\% \\
-ResNet18 & 91.68\% \\
-\bottomrule
-\end{tabular}
-\caption{Test accuracy across all models.}
-\label{tab:comparison}
-\end{table}
-
-Table~\ref{tab:comparison} summarizes all four models. ResNet18 with transfer learning is clearly the strongest, suggesting that pretrained features mattered far more than architectural depth or regularization for a small CNN trained from scratch.
+The small standard deviation in Table~\ref{tab:cv} indicates the ResNet18 result is stable across splits.
 
 \subsection{Saliency Maps and SmoothGrad}
 \label{sec:saliency-results}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.9\textwidth]{{salency og smoothgrad}.jpg}
-\caption{Five hotdog test images (top), their vanilla saliency maps (middle), and SmoothGrad maps with $\sigma=0.15$ (bottom).}
+\includegraphics[width=0.85\textwidth]{{salency og smoothgrad}.jpg}
+\caption{Five hotdog test images (top), vanilla saliency (middle), and SmoothGrad, $\sigma=0.15$ (bottom).}
 \label{fig:saliency}
 \end{figure*}
 
-Figure~\ref{fig:saliency} shows the five test images alongside their vanilla saliency and SmoothGrad maps (Section~\ref{sec:background-saliency}). Do the saliency maps make sense? Only partially. The vanilla saliency maps are dominated by high-frequency, speckled noise spread across the entire image, with no clear concentration on the hotdog itself. SmoothGrad is somewhat cleaner, and for two of the five images (the hotdog-and-fries combo and the person eating a hotdog) there is a faintly brighter region roughly overlapping the hotdog/mouth area, suggesting the model does pick up on relevant content there. For the other three images, however, the improvement over vanilla saliency is marginal, and none of the maps produce a crisp outline of the hotdog shape.
+Do the saliency maps (Fig.~\ref{fig:saliency}) make sense? Only partially: vanilla saliency is dominated by speckled noise across the whole image. SmoothGrad is somewhat cleaner and, for two of the five images, shows a faint bright region near the hotdog/mouth, but the improvement is marginal overall and no map gives a crisp hotdog outline. A likely cause is that the gradient passes through the deep, frozen, piecewise-linear ResNet18 backbone, which is known to produce noisy raw gradients~\cite{smilkov2017smoothgrad}; a larger sample count or a $\sigma$ sweep (not explored here due to time) would likely help.
 
-A likely explanation is that the saliency gradient passes through the entire ResNet18 backbone, which was pretrained on ImageNet and kept frozen; only the final classifier layer was fine-tuned. The backbone is a deep, piecewise-linear network (many ReLU non-linearities), which is exactly the kind of network known to produce noisy raw gradients~\cite{smilkov2017smoothgrad}. SmoothGrad's noise-averaging only partially compensates for this with a modest sample count ($n=25$) and a single, fairly arbitrarily chosen noise level ($\sigma=0.15$). A larger sample count or a small sweep over $\sigma$ would likely produce clearer maps, but this was not explored further here due to time constraints.
+\subsection{Limitations}
 
-\subsection{Discussion}
-
-The experiments show that increasing model complexity alone is not sufficient to obtain better performance: the deeper CNN had more feature-extraction layers, but its test accuracy remained similar to (in fact slightly below) the basic CNN, indicating that the main limitation was not simply the number of layers. Batch normalization and regularization helped control the training process, but the regularized model only matched the baseline's test accuracy in this run rather than clearly outperforming it; the random augmentation may also have made the training task harder, while the dataset's size and visual variation limited the achievable performance of the small CNNs.
-
-Transfer learning was substantially more effective. ResNet18 could leverage representations learned from a much larger dataset, allowing it to generalize better to the hotdog classification task than any model trained from scratch on this relatively small dataset.
-
-\subsection{Limitations and Remaining Analysis}
-
-The current analysis does not yet contain a systematic list of misclassified test images, only a qualitative check on a handful of custom images. A full confusion-matrix-style breakdown of which test images are misclassified, and why, would strengthen the error analysis.
-
-The saliency and SmoothGrad maps (Section~\ref{sec:saliency-results}) are noisier than typical examples in the literature; a hyperparameter sweep over the noise level $\sigma$ and the number of samples $n$ was not performed and is left as future work.
-
-Model selection throughout development used a held-out validation split from the training data (Section~\ref{sec:method}); the separate test set was evaluated only once per model, at the end of training. Results reported here as single-split test accuracy could additionally be cross-checked against the five-fold cross-validation numbers in Table~\ref{tab:cv}.
+We lack a systematic list of misclassified test images beyond a qualitative check. Model selection used the held-out validation split throughout (Section~\ref{sec:method}); the test set was evaluated once per model.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-The best-performing approach was transfer learning with ResNet18, achieving 91.68\% test accuracy, while five-fold cross-validation produced a mean validation accuracy of 93.99\% with a standard deviation of 1.18 percentage points. The results demonstrate that pretrained convolutional features can provide a substantial advantage over a small CNN trained from scratch, even when only the final classifier layer is fine-tuned.
+Transfer learning with ResNet18 was the best approach, reaching 91.68\% test accuracy (5-fold CV: $93.99\%\pm1.18$pp), well above any CNN trained from scratch. Saliency/SmoothGrad maps give only a weak signal that the model attends to the hotdog region, suggesting noisy gradients through the frozen backbone; a more thorough error analysis and a SmoothGrad hyperparameter sweep are natural next steps.
 
-Saliency and SmoothGrad maps show only a weak, partial signal that the model attends to the hotdog region itself, suggesting the frozen ImageNet backbone's raw gradients remain noisy even after averaging. A more thorough error analysis and a hyperparameter sweep for SmoothGrad are natural next steps for future work.
-
-\subsection*{Use of Generative AI}
-
-ChatGPT was used as a programming assistant during the project. It helped with debugging file paths and tensor shapes, suggesting model variations, explaining convolutional neural networks and transfer learning, and organizing parts of this report.
-
-The project decisions, interpretation of the results, and understanding of the underlying machine learning methods were based on the students' existing background in artificial intelligence and independent evaluation of the experiments. ChatGPT was used as support, not as a replacement for the students' technical work or judgment.
+\paragraph{Use of Generative AI.} ChatGPT assisted with debugging file paths/tensor shapes, suggesting model variations, explaining CNNs and transfer learning, and organizing this report. Project decisions, result interpretation, and understanding of the methods relied on the students' own background and independent evaluation; ChatGPT was support, not a replacement for that work.
 
 {
     \small
