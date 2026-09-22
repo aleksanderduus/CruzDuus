@@ -117,7 +117,7 @@ The five test images, their vanilla saliency maps, and their SmoothGrad maps (σ
 
 ![Vanilla saliency maps for five hotdog test images](salency.jpg)
 
-![Vanilla saliency (middle row) vs. SmoothGrad, σ=0.15 (bottom row)](salency%20og%20smoothgrad.jpg)
+![Vanilla saliency (middle row) vs. SmoothGrad, σ=0.15 (bottom row)](salency_smoothgrad.jpg)
 
 Do the saliency maps make sense? Only partially. The vanilla saliency maps are dominated by high-frequency, speckled noise spread across the entire image, with no clear concentration on the hotdog itself. SmoothGrad is somewhat cleaner, and for two of the five images (the hotdog-and-fries combo and the person eating a hotdog) there is a faintly brighter region roughly overlapping the hotdog/mouth area, suggesting the model does pick up on relevant content there. For the other three images, however, the improvement over vanilla saliency is marginal, and none of the maps produce a crisp outline of the hotdog shape.
 
