@@ -108,6 +108,20 @@ Val. acc. & 94.63\% & 93.90\% & 92.42\% & 95.84\% & 93.15\% \\
 
 The small standard deviation in Table~\ref{tab:cv} indicates the ResNet18 result is stable across splits.
 
+\subsection{Misclassified Test Images}
+\label{sec:misclassified}
+
+Running the ResNet18 model over the full test set, 155 of 1862 images (8.3\%) are misclassified, consistent with the 91.68\% test accuracy in Table~\ref{tab:results}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{misclassified.jpg}
+\caption{Eight misclassified test images, all true \emph{hotdog} predicted as \emph{nothotdog}.}
+\label{fig:misclassified}
+\end{figure}
+
+The examples in Fig.~\ref{fig:misclassified} reveal a clear, one-sided pattern: every one of them is a true hotdog that the model calls \emph{nothotdog}, not the reverse. Almost all are heavily dressed hotdogs -- chili dogs, cheese dogs, dogs buried in onions or relish -- where toppings obscure the classic bun-and-sausage silhouette, so the image reads more like a bowl of chili or a plate of nachos. Confidence is mostly low (51--65\%, near a coin flip) except for one chili-cheese dog misclassified at 91\% confidence, where the sausage itself is barely visible under cheese and beans. This suggests the model leans heavily on the plain hotdog shape learned from ImageNet-style images and struggles once that shape is visually obscured, an obvious and interpretable failure mode.
+
 \subsection{Saliency Maps and SmoothGrad}
 \label{sec:saliency-results}
 
@@ -122,7 +136,7 @@ Do the saliency maps (Fig.~\ref{fig:saliency}) make sense? Only partially: vanil
 
 \subsection{Limitations}
 
-We lack a systematic list of misclassified test images beyond a qualitative check.
+Beyond the eight examples in Fig.~\ref{fig:misclassified}, we have not systematically checked whether the same "obscured shape" pattern holds across all 155 misclassified images, nor examined the false positives (nothotdog predicted as hotdog) separately.
 
 \section{Conclusion}
 \label{sec:conclusion}
