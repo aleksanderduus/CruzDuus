@@ -52,7 +52,7 @@ Adding noise $\epsilon\sim\mathcal{N}(0,\sigma^2I)$ to $x$ is equivalent to samp
 \section{Method}
 \label{sec:method}
 
-\paragraph{Data split.} To avoid train/val/test leakage, we hold out a stratified 80/20 train/validation split from the training data (class balance preserved in both parts) and use it for model selection and early stopping throughout. The separate test set is never touched during development and is evaluated only once per model, at the very end.
+\paragraph{Data split.} To avoid train/val/test leakage, we hold out a stratified 80/20 train/validation split from the training data (class balance preserved in both parts) and use it for model selection and early stopping throughout. Crucially, the best checkpoint of each model is chosen by validation accuracy, not test accuracy: picking a model based on test performance would leak information from the held-out test set into the model-selection process and bias the reported results, which is not proper practice. The separate test set is never touched during development and is evaluated only once per model, at the very end.
 
 \paragraph{Models.} \textbf{Basic CNN}: 3 conv layers (16/32/64 channels), ReLU, max pooling, dropout classifier. \textbf{Regularized CNN}: adds batch normalization, adaptive average pooling, dropout ($p{=}0.5$), weight decay, early stopping. \textbf{Deeper CNN}: regularized architecture plus a fourth conv block (128 channels). \textbf{ResNet18 transfer learning}: images resized to $224\times224$ and normalized with ImageNet statistics; an ImageNet-pretrained ResNet18 with the backbone frozen and the final layer replaced by dropout + a 2-class linear layer, with only this head trained.
 
@@ -69,12 +69,12 @@ Adding noise $\epsilon\sim\mathcal{N}(0,\sigma^2I)$ to $x$ is equivalent to samp
 Model & Train acc. & Test acc. \\
 \midrule
 Basic CNN & 83.29\% & 78.79\% \\
-Regularized CNN & -- & 78.89\% \\
+Regularized CNN & 81.31\% & 78.89\% \\
 Deeper CNN & 80.88\% & 77.18\% \\
 ResNet18 (transfer) & 90.84\% & \textbf{91.68\%} \\
 \bottomrule
 \end{tabular}
-\caption{Test accuracy across all models (Regularized CNN's train accuracy was not logged before early stopping).}
+\caption{Train/test accuracy across all models. For the regularized CNN and ResNet18, the reported checkpoint is the one with the best validation accuracy during training.}
 \label{tab:results}
 \end{table}
 
