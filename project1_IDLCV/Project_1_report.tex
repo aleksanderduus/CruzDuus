@@ -116,11 +116,11 @@ Running the ResNet18 model over the full test set, 155 of 1862 images (8.3\%) ar
 \begin{figure}[h]
 \centering
 \includegraphics[width=\linewidth]{misclassified.jpg}
-\caption{Eight misclassified test images, all true \emph{hotdog} predicted as \emph{nothotdog}.}
+\caption{Four false negatives, true \emph{hotdog} predicted \emph{nothotdog} (top), and four false positives, true \emph{nothotdog} predicted \emph{hotdog} (bottom).}
 \label{fig:misclassified}
 \end{figure}
 
-The examples in Fig.~\ref{fig:misclassified} reveal a clear, one-sided pattern: every one of them is a true hotdog that the model calls \emph{nothotdog}, not the reverse. Almost all are heavily dressed hotdogs -- chili dogs, cheese dogs, dogs buried in onions or relish -- where toppings obscure the classic bun-and-sausage silhouette, so the image reads more like a bowl of chili or a plate of nachos. Confidence is mostly low (51--65\%, near a coin flip) except for one chili-cheese dog misclassified at 91\% confidence, where the sausage itself is barely visible under cheese and beans. This suggests the model leans heavily on the plain hotdog shape learned from ImageNet-style images and struggles once that shape is visually obscured, an obvious and interpretable failure mode.
+Fig.~\ref{fig:misclassified} shows both error directions. The false negatives (top row) are all heavily dressed hotdogs -- chili dogs, cheese dogs, a tray of hotdogs half-hidden in their buns -- where toppings obscure the plain bun-and-sausage silhouette; confidence is mostly low (51--53\%, near a coin flip), except one chili-cheese dog at 91\%, where the sausage is barely visible under cheese and beans. The false positives (bottom row) show the opposite failure: foods with an elongated, bread- or wrapper-enclosed shape are mistaken for hotdogs with very high confidence -- spring rolls at 98.9\% and a prosciutto sandwich at 97.0\% -- while a charcuterie platter (51.7\%) and a pasta dish (56.2\%) are much weaker, near-coin-flip errors with no obvious shape cue. Together this suggests the model relies heavily on the elongated hotdog silhouette: dressed hotdogs that hide this shape are missed, while other foods that happen to share it are confidently mistaken for hotdogs, an obvious and interpretable failure mode in both directions.
 
 \subsection{Saliency Maps and SmoothGrad}
 \label{sec:saliency-results}
@@ -136,7 +136,7 @@ Do the saliency maps (Fig.~\ref{fig:saliency}) make sense? Only partially: vanil
 
 \subsection{Limitations}
 
-Beyond the eight examples in Fig.~\ref{fig:misclassified}, we have not systematically checked whether the same "obscured shape" pattern holds across all 155 misclassified images, nor examined the false positives (nothotdog predicted as hotdog) separately.
+Beyond the eight examples in Fig.~\ref{fig:misclassified}, we have not systematically checked whether the same shape-based pattern holds across all 155 misclassified images.
 
 \section{Conclusion}
 \label{sec:conclusion}
