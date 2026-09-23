@@ -52,6 +52,8 @@ Adding noise $\epsilon\sim\mathcal{N}(0,\sigma^2I)$ to $x$ is equivalent to samp
 \section{Method}
 \label{sec:method}
 
+\paragraph{Data split.} To avoid train/val/test leakage, we hold out a stratified 80/20 train/validation split from the training data (class balance preserved in both parts) and use it for model selection and early stopping throughout. The separate test set is never touched during development and is evaluated only once per model, at the very end.
+
 \paragraph{Models.} \textbf{Basic CNN}: 3 conv layers (16/32/64 channels), ReLU, max pooling, dropout classifier. \textbf{Regularized CNN}: adds batch normalization, adaptive average pooling, dropout ($p{=}0.5$), weight decay, early stopping. \textbf{Deeper CNN}: regularized architecture plus a fourth conv block (128 channels). \textbf{ResNet18 transfer learning}: images resized to $224\times224$ and normalized with ImageNet statistics; an ImageNet-pretrained ResNet18 with the backbone frozen and the final layer replaced by dropout + a 2-class linear layer, with only this head trained.
 
 \paragraph{Training.} All models use cross-entropy loss and Adam (lr $=0.001$); the regularized CNN adds weight decay $10^{-4}$ and early stopping (patience 3). Stratified 5-fold cross-validation on the training set further checks the stability of the ResNet18 result. For saliency, we use the gradient of the \emph{hotdog} class score (Eq.~\ref{eq:saliency}) on 5 hotdog test images, and SmoothGrad (Eq.~\ref{eq:smoothgrad}) with $n{=}25$, $\sigma{=}0.15$; both are reduced to a heatmap via the max absolute gradient across color channels.
@@ -109,7 +111,7 @@ Do the saliency maps (Fig.~\ref{fig:saliency}) make sense? Only partially: vanil
 
 \subsection{Limitations}
 
-We lack a systematic list of misclassified test images beyond a qualitative check. The test set was held out and evaluated only once per model, at the end of training.
+We lack a systematic list of misclassified test images beyond a qualitative check.
 
 \section{Conclusion}
 \label{sec:conclusion}
