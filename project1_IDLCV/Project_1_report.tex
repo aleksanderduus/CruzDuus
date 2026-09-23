@@ -6,6 +6,7 @@
 \usepackage{cuted}     %< for strip environment
 \usepackage{currfile}  %< for \currfilebase macro
 \usepackage{caption}   %< for "\captionof" commands (teaser)
+\usepackage{placeins}  %< for \FloatBarrier, keeps figures from drifting away from their section
 
 \definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
 \usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
@@ -119,6 +120,7 @@ Running the ResNet18 model over the full test set, 155 of 1862 images (8.3\%) ar
 \caption{Four false negatives, true \emph{hotdog} predicted \emph{nothotdog} (top), and four false positives, true \emph{nothotdog} predicted \emph{hotdog} (bottom).}
 \label{fig:misclassified}
 \end{figure}
+\FloatBarrier
 
 Fig.~\ref{fig:misclassified} shows both error directions. The false negatives (top row) are all heavily dressed hotdogs -- chili dogs, cheese dogs, a tray of hotdogs half-hidden in their buns -- where toppings obscure the plain bun-and-sausage silhouette; confidence is mostly low (51--53\%, near a coin flip), except one chili-cheese dog at 91\%, where the sausage is barely visible under cheese and beans. The false positives (bottom row) show the opposite failure: foods with an elongated, bread- or wrapper-enclosed shape are mistaken for hotdogs with very high confidence -- spring rolls at 98.9\% and a prosciutto sandwich at 97.0\% -- while a charcuterie platter (51.7\%) and a pasta dish (56.2\%) are much weaker, near-coin-flip errors with no obvious shape cue. Together this suggests the model relies heavily on the elongated hotdog silhouette: dressed hotdogs that hide this shape are missed, while other foods that happen to share it are confidently mistaken for hotdogs, an obvious and interpretable failure mode in both directions.
 
@@ -131,6 +133,7 @@ Fig.~\ref{fig:misclassified} shows both error directions. The false negatives (t
 \caption{Five hotdog test images (top), vanilla saliency (middle), and SmoothGrad, $\sigma=0.15$ (bottom).}
 \label{fig:saliency}
 \end{figure*}
+\FloatBarrier
 
 Do the saliency maps (Fig.~\ref{fig:saliency}) make sense? Only partially: vanilla saliency is dominated by speckled noise across the whole image. SmoothGrad is somewhat cleaner and, for two of the five images, shows a faint bright region near the hotdog/mouth, but the improvement is marginal overall and no map gives a crisp hotdog outline. A likely cause is that the gradient passes through the deep, frozen, piecewise-linear ResNet18 backbone, which is known to produce noisy raw gradients; a larger sample count or a $\sigma$ sweep (not explored here due to time) would likely help.
 
@@ -141,8 +144,8 @@ Beyond the eight examples in Fig.~\ref{fig:misclassified}, we have not systemati
 \section{Conclusion}
 \label{sec:conclusion}
 
-Transfer learning with ResNet18 was the best approach, reaching 91.68\% test accuracy (5-fold CV: $93.99\%\pm1.18$pp), well above any CNN trained from scratch. Saliency/SmoothGrad maps give only a weak signal that the model attends to the hotdog region, suggesting noisy gradients through the frozen backbone; a more thorough error analysis and a SmoothGrad hyperparameter sweep are natural next steps.
+Transfer learning with ResNet18 was the best approach, reaching 91.68\% test accuracy (5-fold CV: $93.99\%\pm1.18$pp), well above any CNN trained from scratch. Saliency/SmoothGrad maps give only a weak signal that the model attends to the hotdog region, suggesting noisy gradients through the frozen backbone. It can seem like a lot of the false positive misclassifications happens when there is a food related image being predicted, so maybe the dataset should contain more images of food in order for the model to become even more robust.
 
-\paragraph{Use of Generative AI.} ChatGPT assisted with debugging file paths/tensor shapes, suggesting model variations, explaining CNNs and transfer learning, and organizing this report. Project decisions, result interpretation, and understanding of the methods relied on the students' own background and independent evaluation; ChatGPT was support, not a replacement for that work.
+\paragraph{Use of Generative AI.} ChatGPT assisted with debugging file paths/tensor shapes, suggesting model variations, explaining CNNs and transfer learning, and organizing this report. Project decisions, result interpretation, and understanding of the methods relied on our own background and independent evaluation; ChatGPT was support, not a replacement for our work.
 
 \end{document}
